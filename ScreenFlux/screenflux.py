@@ -2,9 +2,18 @@ import sqlite3
 from os.path import expanduser
 import logging
 import sys
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
+from datetime import datetime
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# InfluxDB connection details
+INFLUX_URL = "http://localhost:8086"
+INFLUX_TOKEN = "_H4gpU0VBoFYvoI_yHaGQi05Rahvl63rTlsdOP1VNqSnh9gvBhTMTf-UfZUsnBpY046VVlFgnfOis5kmIHnIxQ=="
+INFLUX_ORG = "Talissa"
+INFLUX_BUCKET = "screentime_data"
 
 def query_database():
     # Connect to the SQLite database
@@ -56,11 +65,38 @@ def query_database():
         logging.error(f"An unexpected error occurred: {e}")
         raise
 
+def write_to_influxdb(data):
+    client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+    write_api = client.write_api(write_options=SYNCHRONOUS)
+    
+    for row in data:
+        app, usage, start_time, end_time, created_at, tz, device_id, device_model = row
+        
+        # Convert Unix timestamp to datetime
+        start_time = datetime.utcfromtimestamp(start_time)
+        
+        point = Point("screen_time") \
+            .tag("app", app) \
+            .tag("device_id", device_id) \
+            .tag("device_model", device_model) \
+            .field("usage", float(usage)) \
+            .time(start_time)
+        
+        write_api.write(bucket=INFLUX_BUCKET, record=point)
+    
+    logging.info(f"Wrote {len(data)} points to InfluxDB")
+    client.close()
+
 def main():
     try:
         data = query_database()
         logging.info("Data retrieved successfully")
-        # Here you would typically process the data further or send it to InfluxDB
+        
+        if data:
+            write_to_influxdb(data)
+        else:
+            logging.warning("No data retrieved from SQLite database")
+        
         # For demonstration, let's just print the first few rows
         for row in data[:5]:
             logging.info(f"Sample data: {row}")
