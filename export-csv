@@ -1,0 +1,23 @@
+import csv
+from datetime import datetime
+
+def write_to_csv(data, filename='screen_time_data.csv'):
+    with open(filename, 'w', newline='') as csvfile:
+        fieldnames = ['app', 'usage', 'start_time', 'end_time', 'device_id', 'device_model']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for row in data:
+            writer.writerow({
+                'app': row[0],
+                'usage': row[1],
+                'start_time': datetime.fromtimestamp(row[2]),
+                'end_time': datetime.fromtimestamp(row[3]),
+                'device_id': row[6] or 'unknown',
+                'device_model': row[7] or 'unknown'
+            })
+    logging.info(f"Data written to {filename}")
+
+# In your main function:
+data = query_database()
+write_to_csv(data)
